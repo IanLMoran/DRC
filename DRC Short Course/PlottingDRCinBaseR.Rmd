@@ -1,0 +1,62 @@
+---
+title: "DRC Base R Plotting Example"
+output: html_document
+date: "2022-10-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load packages
+```{r}
+library(drc)
+library(tidyverse)
+```
+
+
+Preview data
+```{r}
+ggplot(daphnids,aes(dose,no/total, color = time))+
+  geom_point()
+```
+Fit models
+```{r}
+m1 <- drm(no/total~dose, time, weights = total, data = daphnids[daphnids$time == "48h",], fct = LL.2(), type = "binomial")
+summary(m1)
+
+m2 <- drm(no/total~dose, time, weights = total, data = daphnids[daphnids$time == "24h",], fct = LL.2(), type = "binomial")
+summary(m1)
+```
+Plot models in base R
+```{r}
+plot(m1)
+plot(m2)
+```
+Add confidence intervals and overlayed curves
+```{r}
+color1 <- "turquoise4"
+color2 <- "tomato"
+  
+plot(m1, col = color1, xlab = "Concentration", ylab = "Proportion Immobile", main = "Base R Plot Example with Daphnid Data")
+plot(m1, add = TRUE, type = "confidence", col = color1)
+plot(m2, add = TRUE, col = color2)
+plot(m2, add = TRUE, col = color2,type = "confidence")
+legend(x= 200, y= 0.8, legend=c("48hr","24hr"), col = c(color1,color2), lty = 1, lwd = 2)
+```
+Add breakpoint (remove chunk of y-axis to better center the data)
+```{r}
+breakpoint <- 200
+
+color1 <- "turquoise4"
+color2 <- "tomato"
+  
+plot(m1, col = color1, broken = TRUE, bp = breakpoint, xlab = "Concentration", ylab = "Proportion Immobile", main = "Base R Plot Example with Daphnid Data")
+plot(m1, add = TRUE, type = "confidence", col = color1, bp = breakpoint)
+plot(m2, add = TRUE, col = color2, bp = breakpoint)
+plot(m2, add = TRUE, col = color2, bp = breakpoint, type = "confidence")
+legend(x= 200, y= 0.8, legend=c("48hr","24hr"), col = c(color1,color2), lty = 1, lwd = 2)
+```
+
+
+
