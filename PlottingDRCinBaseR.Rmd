@@ -44,7 +44,7 @@ plot(m2, add = TRUE, col = color2)
 plot(m2, add = TRUE, col = color2,type = "confidence")
 legend(x= 200, y= 0.8, legend=c("48hr","24hr"), col = c(color1,color2), lty = 1, lwd = 2)
 ```
-Add breakpoint (remove chunk of y-axis to better center the data)
+Add breakpoint (remove chunk of x-axis to better center the data)
 ```{r}
 breakpoint <- 200
 
