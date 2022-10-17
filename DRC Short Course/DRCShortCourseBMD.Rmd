@@ -1,0 +1,326 @@
+---
+title: "BMD"
+author: "Ian Moran"
+date: "November 3, 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(devtools)
+install_github(("DoseResponse/bmd"))
+library(drc)
+library(drcData)
+library(bmd)
+```
+
+##Example 1 Binary
+```{r}
+chlorac.LN.3<-drm(num.dead/total~conc,
+                  data=chlorac, type="binomial",
+                  weights=total, fct= LN.3u())
+```
+
+Estimate BMD associated with BMR=0.05 and the additional risk definition
+backgType= estimate background or define apriori? We choose to estimate background in model
+```{r}
+bmd(chlorac.LN.3,bmr=0.05,backgType="modelBased",def="additional")
+```
+Estimate BMD associated with BMR=0.05 and the excess risk defintion
+```{r}
+bmd(chlorac.LN.3,bmr=0.05,backgType="modelBased",def="excess")
+```
+
+##EXample 2 Continuous
+```{r}
+head(GiantKelp)
+```
+Fitting 4 parameter log-logistic model
+```{r}
+giantKelp.LL.4<-drm(tubeLength~dose, data=GiantKelp,
+                    fct=LL.4())
+```
+Plotting data and fitting model
+```{r}
+plot(giantKelp.LL.4,type="all", broken=TRUE)
+
+
+```
+
+##Using expert knowledge 
+Estimate BMD associated with BMR=0.1, using hybrid approach (continuous data) with tube length <14mm assumed to be adverse event
+background is not p0 for continuous data, background is x0 (specified in lecture notes) the predetermined response corresponding to adverse event
+background is not intuitive here, specified in bmd help page,
+```{r}
+bmd(giantKelp.LL.4,bmr = 0.1,backgType = "absolute",backg=14, def="hybridAdd")
+```
+##Expert knowledge another way,create new column in data frame with indicator variable (0 or 1)
+```{r}
+GiantKelp$adverse<-with(GiantKelp,ifelse(tubeLength<14,1,0))
+```
+
+##Fit dose response data to this binomial version of data
+```{r}
+giantKelp.bin<-drm(adverse~dose,data=GiantKelp,
+                   type="binomial",fct=LL.4())
+```
+Estimate BMD, associated with BMR=0.1 and the additional risk definition
+```{r}
+bmd(giantKelp.bin, bmr=0.1, backgType="modelBased",def="additional")
+```
+Dose cant be zero therefor truncate to zero. interpreation is that any dose could cause 10% effect. Turning continuous data binary loses a ton of information which results in large confidence intervals. Takeaway: don't do this, stay on continuous scale (hybrid approach)
+
+##BMD estimation without expert knowledge, specify "adverse event" or background level in this case using hybrid approach meaning looking at extreme values from the control distribution. Imagine the upper tail of a normal distribution super imposed on control responses (image in slides)
+
+Specify background risk as response levels more than 2 standard deviations from the mean. Again in this case with continuous data background risk=adverse event
+within this backgType the number for backg refers to StdDev units (in BMD help page)
+```{r}
+bmd(giantKelp.LL.4,bmr=0.1,backgType="hybridSD",backg=2,def="hybridAdd")
+
+```
+##Dealing with model misspecification. Visual inspection reveals more variance around middle of curve
+```{r}
+#coeftest(giantKelp.LL.4,) ***complete later
+```
+##Example 3
+```{r}
+#file.choose() Use this line to find file path then hash out
+CopperTemp<-read.csv("C:\\Users\\morania\\Documents\\VarTemp.csv")
+```
+
+Check for successful import
+```{r}
+str(CopperTemp)
+```
+Fitting 3 parameter log-logistic, because its assumed that at highest temperature there will be no offspring
+```{r}
+CopperTemp.LL.3<-drm(Offspring~Conc,
+                     data=CopperTemp,
+                     fct=LL.3(), type="Poisson")
+```
+Broken=TRUE is a trick to get zero on a log axis
+```{r}
+plot(CopperTemp.LL.3,broken=TRUE, type="all")
+```
+
+Estimating BMD using BMR=0.1 and the relative definition (change in offspring relative to control group)
+```{r}
+bmd(CopperTemp.LL.3,bmr=0.1, backgType="modelBased", def="relative")
+```
+
+Summary of model fit
+```{r}
+summary(CopperTemp.LL.3)
+```
+Fitting a new model that takes into account that nematodes dont have the same lifespan
+```{r}
+CopperTemp.m2<-drm(Offspring~Conc,weights=Lifespan,
+                   fct=LL.3(),data=CopperTemp, type="Poisson")
+```
+
+Summary of the fitted model
+```{r}
+summary(CopperTemp.m2)
+```
+```{r}
+plot(CopperTemp.m2)
+```
+Doesnt work because model is fitted to offspring per day
+
+
+Weights divide offspring by lifespan in days, summary output is now in terms of offspring per day
+
+BMD for new model
+```{r}
+bmd(CopperTemp.m2, bmr=0.1,backgType="modelBased",def="relative")
+```
+BMD is the concentration estimated to cause a 10% reduction in offspring/day relative to control
+
+##Dealing with potential overdispersion
+Overdispersion may be a problem especially with Poisson because one parameter describes mean and variance, rare not to see overdispersion in Poisson models
+
+Use robust standard errors on the fitted model
+```{r}
+bmd(CopperTemp.m2, bmr=0.1, backgType="modelBased", def="relative", sandwich.vcov = TRUE)
+```
+
+Other option is to change the underlying assumption about distribution. Fitting a model that assumes a negative binomial distribution. Extra parameter to estimate variance
+```{r}
+CopperTemp.m3<-drm(Offspring~Conc,data=CopperTemp, weights=Lifespan,
+                   fct=LL.3(),type="negbin2")
+```
+Estimate BMD from new model
+```{r}
+bmd(CopperTemp.m3,bmr=0.1, backgType="modelBased", def="relative")
+```
+
+##Example 4
+Fish test 
+```{r}
+str(O.mykiss)
+```
+
+get rid of missing data
+```{r}
+O.mykiss.c<-na.omit(O.mykiss)
+```
+Fitting model, 2 parameter exponential decay model
+```{r}
+O.mykiss.c.EXD<-drm(weight~conc,data=O.mykiss.c, fct=EXD.2())
+```
+
+Plot model
+```{r}
+plot(O.mykiss.c.EXD, type="all", broken=TRUE, xlim=c(0,10000), ylim=c(0,4))
+```
+
+Estimate BMD for BMR=0.05, using the hybrid definition with 2SDs to define adverse effect (Background Level)
+```{r}
+bmd(O.mykiss.c.EXD,bmr=0.05,backgType = "hybridSD", backg=2, def="hybridAdd")
+```
+
+Fitting three alternative models to the data
+
+```{r}
+
+O.mykiss.c.LL.3<-drm(weight~conc,data=O.mykiss.c, fct=LL.3())
+O.mykiss.c.W1.3<-drm(weight~conc,data=O.mykiss.c, fct=W1.3())
+O.mykiss.c.W2.3<-drm(weight~conc,data=O.mykiss.c, fct=W2.3())
+
+```
+
+
+BMD for new models
+```{r}
+bmd(O.mykiss.c.LL.3, bmr=0.05, backgType = "hybridSD", backg=2, def="hybridAdd")
+bmd(O.mykiss.c.W1.3, bmr=0.05, backgType = "hybridSD", backg=2, def="hybridAdd")
+bmd(O.mykiss.c.W2.3, bmr=0.05, backgType = "hybridSD", backg=2, def="hybridAdd")
+
+```
+
+Plot all 4 models
+```{r}
+plot(O.mykiss.c.EXD, broken=TRUE, type="all", ylim=c(0,4), xlim=c(0,10000))
+plot(O.mykiss.c.LL.3, broken=TRUE, type="all", ylim=c(0,4), xlim=c(0,10000), lty=2, add=TRUE)
+plot(O.mykiss.c.W1.3, broken=TRUE, type="all", ylim=c(0,4), xlim=c(0,10000), lty=3, add=TRUE)
+plot(O.mykiss.c.W2.3, broken=TRUE, type="all", ylim=c(0,4), xlim=c(0,10000), lty=4, add=TRUE)
+```
+
+Again this is not preferable, ideally choose model ahead of time
+
+Compare models using AIC
+```{r}
+AIC(O.mykiss.c.EXD,O.mykiss.c.LL.3, O.mykiss.c.W1.3,O.mykiss.c.W2.3)
+```
+All models have same AIC score, no clear argument that one is better from graphs or from AIC. 
+But yield different BMD values. Therefor solution is model averaging
+
+Estimating a model-averaged BMD
+```{r}
+modelList<-list(O.mykiss.c.EXD,O.mykiss.c.LL.3, O.mykiss.c.W1.3,O.mykiss.c.W2.3)
+
+bmdMA(modelList,bmr=0.05, modelWeights = "AIC", backgType = "hybridSD", backg=2, def="hybridAdd", type = "Buckland")
+```
+
+weights are essentially the same in this example because AIC scores are about equal but could be important in other case
+
+Alternative to Buckland method, bootstapping, preferred approach, in real life use higher R for bootsrapping low number for time sake. Observe same BMD but higher BMDL therefor tighter confidence interval
+```{r}
+#bmdMA(modelList,bmr=0.05, modelWeights = "AIC", backgType = "hybridSD", backg=2, def="hybridAdd", type = "bootstrap", R=100)
+```
+
+##Example 5
+Issue with this dataset because the formatting is weird and different between European and American computers and use of semicolon vs comma for separating CSV
+```{r}
+file.choose()
+alpha.cyp<-read.csv2()
+str(alpha.cyp)
+
+```
+
+
+
+
+```{r}
+fitFct.LL.2<-function(dataset){drm(Immobile/Totatl~Dose,
+                                   data=dataset,
+                                   weights=Total,
+                                   type="binomial",
+                                   fct=LL.2)}
+```
+
+Apply my function on each subset of the alpha.cyp data set defined by experiment. 
+Alternatively with a smallish dataset could model each experiment separately than combine
+```{r}
+library(plyr)
+
+modelFits<-dlply(alpha.cyp, "Exp.", fitFct.LL.2)
+```
+Apply bmd() on each element of list
+```{r}
+BMDLists<-lapply(modelFits,
+                 FUN=function(x){
+                   bmd(x, bmr=0.05, backgType = "modelBased", def="excess", display = FALSE)
+                 })
+```
+
+
+
+
+
+What does an element in BMDList look like?
+```{r}
+BMDList[1]
+```
+
+
+Combine all information of BMDs and their SEs in a data frame
+```{r}
+BMDvec<-sapply(BMDList,FUN=x{x$Results[1]})
+SEvec<-sapply(BMDLists,FUN=x{x$SE})
+
+step2data<-dataframe(BMD=BMDvec,SE=SEvec)
+step2data
+```
+
+
+Fitting meta-analytic model
+```{r}
+library(metafor)
+meta.m1<- rma(BMD, SE^2,data=step2data,level=0.9)
+
+```
+level=0.9 because interested in one sided confidence interval? dont totally get this
+
+
+Estimate BMD
+```{r}
+meta.m1.beta
+```
+
+Estimate BMDL
+```{r}
+meta.m1$ci.lb
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

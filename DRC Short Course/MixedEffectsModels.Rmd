@@ -1,0 +1,72 @@
+---
+title: "Mixed Effects Models"
+author: "Ian Moran"
+date: "November 3, 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Mixed Effects Models
+This is like previous BMD work where we model a bunch of curves separately then combine them but in this case we model all at the same time.
+Useful for capturing variation across days when repeating experiments across days
+mixed models included fixed factors and factors that are random variables
+```{r}
+library(drc)
+library(drcData)
+library(devtools)
+install_github("DoseResponse/medrc")
+
+```
+```{r}
+str(vinclozolin)
+```
+
+###Naive approach, ignore the fact that the 6 experiments are not true replicates (pseduoreplication)
+```{r}
+vinclo.nonlin<-drm(effect~conc, data=vinclozolin,fct=LL.4())
+summary(vinclo.nonlin)
+```
+
+##Fitting mixed effect model
+```{r}
+library(medrc)
+
+vinclo.nlmm<-medrm(effect~conc,data=vinclozolin, fct=LL.4(),
+                   random= d~1|exper)
+```
+This is simplest way to specify.. says that parameter d, the 
+alternatively could assume e+d~1|exper
+
+```{r}
+summary(vinclo.nlmm)
+```
+
+negative c is not great, maybe limit to 3 parameter model, not today
+
+Compare EC values across naive and mixed model
+```{r}
+ED(vinclo.nonlin, c(10,20,50))
+
+ED(vinclo.nlmm, c(10,20,50))
+```
+
+##Last example Species sensitivity distributions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

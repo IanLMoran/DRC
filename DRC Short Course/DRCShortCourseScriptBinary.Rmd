@@ -1,0 +1,108 @@
+---
+title: "DRCShortCourseBinaryData"
+author: "Ian Moran"
+date: "November 3, 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+##Markdown Notes:
+(double hastag is header, triple is sub header)
+Ctrl Alt I creates new box for r code!
+Ctrl Shift K to Knit (export to word)
+
+## Binary data
+
+###Looking at data (Example 1)
+
+
+```{r}
+library(drc)
+library(drcData)
+
+acute.inh
+```
+With so little data (4 concentrations) difficult to validate model because model choice will dictate results. With large dataset can compare models and validate because signal in data can come through
+
+###Fitting a dose-response model
+We fit a 2-parameter log-logistic model (A special case of logistic regression)
+```{r}
+acute.inh.LL.2<-drm(num.dead/total~dose,
+                    weights=total,
+                    data=acute.inh,
+                    fct=LL.2(),
+                    type="binomial")
+```
+
+weight is important because the 1 dead in 5 gives same ratio as 10 in 50 therefor want to weight ratios by total number of organisms so that higher numbers can contribute more to standard error
+type=binomial because it's the aggregation of binary trials
+No way to assess model fit beyond looking at fitted curve
+
+##Showing fitted curve
+```{r}
+plot(acute.inh.LL.2)
+```
+##Summary
+```{r}
+summary(acute.inh.LL.2)
+```
+
+##obtaining robust standard errors
+```{r}
+coeftest(acute.inh.LL.2,vcov. = sandwich)
+```
+Gain in standard error is because original model assumes that points dont fit perfectly, but they do so the "robust" approach actually reduces standard error because points are exactly on the line. Very rare and product of small dataset with no replication
+
+##Estimate LD Values
+We can use function ED() to estimate LD values
+```{r}
+ED(acute.inh.LL.2,c(10,20,50))
+```
+Confidence intervals
+```{r}
+ED(acute.inh.LL.2,c(10,20,50),interval="delta")
+```
+Once model is specified for binary data, the remaining code is very similar to continuous
+
+##Example 2 (natural mortality)
+Case with natural mortality, want to inclue natural mortality in your model rather than eliminating this important data
+ex control mortality 7.5%
+historically, people would use Abbots formula to subtract base motality form all, this is 20 years outdated.
+
+##Looking at the data
+```{r}
+chlorac
+
+```
+
+Natural mortality:
+```{r}
+3/40*100
+```
+7.5% Natural mortality. Therefor we can't fit 2 parameter model
+```{r}
+chlorac.LN.3<-drm(num.dead/total~conc,
+                  data=chlorac, weights=total,
+                  fct=LN.3u(),type="binomial")
+```
+Log-logistic didnt work, issue with starting values for parameter estimation, therefor proceeded with log-normal
+##Summary of output
+```{r}
+summary(chlorac.LN.3)
+```
+##Plot
+```{r}
+plot(chlorac.LN.3)
+```
+###Estimating LC Values
+```{r}
+ED(chlorac.LN.3,c(10,20,50))
+```
+These values are not entirely correct because calculated relative to the non-zero lower limit (10% mortality on top of baseline)
+LC values relative to zero and 1 obtained like this:
+```{r}
+ED(chlorac.LN.3,c(0.1,0.2,0.5),type="absolute")
+```
+
